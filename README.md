@@ -1,4 +1,4 @@
-# Gatherer::Scraper
+# GathererScraper
 
 TODO: Write a gem description
 

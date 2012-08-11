@@ -1,5 +1,3 @@
-module Gatherer
-  module Scraper
-    VERSION = "0.0.1"
-  end
+module GathererScraper
+  VERSION = "0.0.1"
 end

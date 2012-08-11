@@ -16,5 +16,11 @@ EOS
   gem.test_files    = gem.files.grep(%r{^(test|spec|features)/})
   gem.name          = "gatherer-scraper"
   gem.require_paths = ["lib"]
-  gem.version       = Gatherer::Scraper::VERSION
+  gem.version       = GathererScraper::VERSION
+
+  gem.add_dependency 'activemodel', '~>3.2.0'
+  gem.add_development_dependency 'rspec'
+  gem.add_development_dependency 'rr'
+  gem.add_development_dependency 'vcr'
+  gem.add_development_dependency 'nokogiri'
 end
