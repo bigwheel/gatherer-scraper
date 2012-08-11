@@ -4,9 +4,12 @@ require File.expand_path('../lib/gatherer-scraper/version', __FILE__)
 Gem::Specification.new do |gem|
   gem.authors       = ["bigwheel"]
   gem.email         = ["k.bigwheel+eng@gmail.com"]
-  gem.description   = %q{TODO: Write a gem description}
-  gem.summary       = %q{TODO: Write a gem summary}
-  gem.homepage      = ""
+  gem.description   = <<-EOS
+Scrape Gatherer, Magic: The Gathering official card database
+(http://gatherer.wizards.com/) and extract object form card data.
+EOS
+  gem.summary       = %q{Scrape Gatherer(MTG card database)}
+  gem.homepage      = "http://github.com/bigwheel/gatherer-scraper"
 
   gem.files         = `git ls-files`.split($\)
   gem.executables   = gem.files.grep(%r{^bin/}).map{ |f| File.basename(f) }
