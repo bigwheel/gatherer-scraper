@@ -1,14 +1,15 @@
 require 'spec_helper'
 
 describe GathererScraper::SearchResult do
-  context 'with "Magic 2013" set' do
-    before { @m13set = described_class.new(set: 'Magic 2013') }
-    describe '#multiverseids', :vcr => { :cassette_name => 'gatherer/search', :record => :new_episodes } do
-      subject { @m13set.multiverseids }
-      its(:length) { should == 234 }
-      it '\'s all elements should be unique' do
-        subject.uniq.length.should == subject.length
-      end
+  CardProperty::SUPPORTING_EXPANSION_LIST.each do |cardset|
+    cardset = cardset.to_s
+    context "with '#{cardset}' card set",
+      vcr: { :cassette_name => "search/#{cardset}", :record => :new_episodes } do
+      subject { GathererScraper::search_result(set: cardset) }
+
+      it('should accept') { expect { subject }.not_to raise_error }
+
+      its(:length) { should_not == 0 }
     end
   end
 end

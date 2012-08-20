@@ -47,7 +47,7 @@ class Type
   end
   def self.parse(node)
     _, supertype_and_cardtypes, subtypes =
-      node.content.strip.match(/\A(.*?)(?:  — (.*))?\Z/).to_a
+      node.content.strip.match(/\A(.*?)(?:\s+—\s+(.*?))?\Z/).to_a
     s_c_types_symbol = supertype_and_cardtypes.split(' ').map {|t| t.to_sym}
     supertypes, cardtypes =
       s_c_types_symbol.partition{|symbol| ALL_SUPERTYPE_LIST.include? symbol}
@@ -57,6 +57,6 @@ class Type
                else
                  subtypes.split(' ').map {|t| t.to_sym}
                end
-    CardProperty.validate_using_exception(new(supertypes, cardtypes, subtypes))
+    new(supertypes, cardtypes, subtypes)
   end
 end

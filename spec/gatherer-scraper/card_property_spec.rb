@@ -2,10 +2,17 @@
 require 'spec_helper'
 
 describe CardProperty, :vcr => { :cassette_name => 'gatherer/card', :record => :new_episodes } do
+  context "when url has a 'printed=true' parameter" do
+    it do
+      expect do
+        described_class.parse('http://gatherer.wizards.com/Pages/Card/Details.aspx?printed=true&multiverseid=265718')
+      end.to raise_error(ArgumentError, /This class only supports oracle text/)
+    end
+  end
   context "when 'Acidic Slime' multiverseid is given" do
     before(:all) do
       VCR.use_cassette('gatherer/card', record: :new_episodes) do
-        @acidic_slime = described_class.parse(265718)
+        @acidic_slime = described_class.parse('http://gatherer.wizards.com/Pages/Card/Details.aspx?multiverseid=265718')
       end
     end
     subject { @acidic_slime }
@@ -24,8 +31,10 @@ describe CardProperty, :vcr => { :cassette_name => 'gatherer/card', :record => :
 EOS
     end
     its(:flavor_text) { should be_nil }
+    its(:watermark) { should be_nil }
     its(:'p_t.power') { should == '2' }
     its(:'p_t.toughness') { should == '2' }
+    its(:'loyalty') { should be_nil }
     its(:expansion) { should == :'Magic 2013' }
     its(:rarity) { should == :Uncommon }
 
@@ -48,28 +57,34 @@ EOS
       end
       its(:length) { should == 5 }
     end
-    its(:card_number) { should == 159 }
+    its(:'card_number.number') { should == 159 }
+    its(:'card_number.face') { should == nil }
     its(:artist) { should == 'Karl Kopinski' }
   end
-  context 'when M13 cards are given' do
-    it 'should not raise error' do
-      multiverseids = GathererScraper::SearchResult.new(set: 'Magic 2013').multiverseids
-      expect do
-        multiverseids.each do |multiverseid|
-          begin
-            described_class.parse(multiverseid)
-          rescue => e
-            raise e.exception(e.message + " + multiverseid: #{multiverseid}")
+  shared_examples_for :expansion do |cardset_name|
+    context "when #{cardset_name} cards are given", :vcr => { :cassette_name => "gatherer/cardset/#{cardset_name}", :record => :new_episodes } do
+      subject { GathererScraper::search_result(set: cardset_name) }
+      it 'should not raise error' do
+        expect do
+          subject.each do |url|
+            begin
+              described_class.parse(url)
+            rescue => e
+              raise e.exception(e.inspect + " + url: #{url}")
+            end
           end
-        end
-      end.not_to raise_error
+        end.not_to raise_error
+      end
     end
+  end
+  CardProperty::SUPPORTING_EXPANSION_LIST.each do |expansion_name|
+    include_examples :expansion, expansion_name.to_s
   end
 
   describe '(validation category)' do
     before(:all) do
       VCR.use_cassette('gatherer/card', record: :new_episodes) do
-        @slime = described_class.parse(265718)
+        @slime = described_class.parse('http://gatherer.wizards.com/Pages/Card/Details.aspx?multiverseid=265718')
         def @slime.select(overrides, attr_sym)
           if overrides.has_key? attr_sym
             overrides[attr_sym]
@@ -85,7 +100,10 @@ EOS
                            select(overrides, :type),
                            select(overrides, :card_text),
                            select(overrides, :flavor_text),
+                           select(overrides, :watermark),
+                           select(overrides, :color_indicator),
                            select(overrides, :p_t),
+                           select(overrides, :loyalty),
                            select(overrides, :expansion),
                            select(overrides, :rarity),
                            select(overrides, :all_sets),
@@ -104,7 +122,10 @@ EOS
         subject.type.should == @slime.type
         subject.card_text.should == @slime.card_text
         subject.flavor_text.should == @slime.flavor_text
+        subject.watermark.should == @slime.watermark
+        subject.color_indicator.should == @slime.color_indicator
         subject.p_t.should == @slime.p_t
+        subject.loyalty.should == @slime.loyalty
         subject.expansion.should == @slime.expansion
         subject.rarity.should == @slime.rarity
         subject.all_sets.should == @slime.all_sets
@@ -146,7 +167,7 @@ EOS
       validation_spec(attr_name, " test ", true, value_text:
                       'not striped text (ex: " test ")', error_text: /is invalid/)
       if multiline
-        validation_spec(:flavor_text, "line one\nline two", false,
+        validation_spec(attr_name, "line one\nline two", false,
                         value_text: 'a multiline striped text')
       end
     end
@@ -274,6 +295,24 @@ EOS
       kind_validation_spec :flavor_text, 3, String
       strip_validation_spec :flavor_text, multiline: true
     end
+    describe '#watermark' do
+      nil_validation_spec :watermark, false
+      kind_validation_spec :watermark, 'Mirran', Symbol
+      validation_spec :watermark, :Mirran, false
+      validation_spec :watermark, :Phyrexian, false
+      validation_spec :watermark, :Justice, true, value_text: 'unknown side'
+    end
+    describe '#color_indicator' do
+      nil_validation_spec :color_indicator, false
+      kind_validation_spec :color_indicator, :Red, Enumerable
+      validation_spec :color_indicator, [:Red], false, value_text: '[:Red]'
+      validation_spec(:color_indicator, [:Purple], true,
+                      value_text: 'unknown color (ex: Purple)')
+      validation_spec(:color_indicator, [:Blue, :Black], false,
+                      value_text: 'multiple colors')
+      validation_spec(:color_indicator, [:White, :Green, :White], true,
+                      value_text: 'not unique colors', error_text: /not unique/)
+    end
     describe '#p_t' do
       nil_validation_spec :p_t, false
       kind_validation_spec :p_t, [1, 2], PT
@@ -292,14 +331,21 @@ EOS
       validation_spec '*', '*', false
       validation_spec '*', '1+*', false, value_text: 'Tarmogoyf ( * / 1+* )'
     end
+    describe '#loyalty' do
+      nil_validation_spec :loyalty, false
+      validation_spec :loyalty, 1, false
+      validation_spec(:loyalty, 0, true, value_text: 'Zero(0)',
+                      error_text: /must be greater than or equal to 1/)
+      kind_validation_spec(:loyalty, 1.5, Integer)
+    end
     describe '#expansion' do
       nil_validation_spec :expansion, true
       kind_validation_spec :expansion, 'test', Symbol
       strip_validation_spec :expansion
       validation_spec(:expansion, :'Magic 2013', false,
                       value_text: 'supporting expansion (ex: Magic 2013)')
-      validation_spec(:expansion, :'Magic 2010', true,
-                      value_text: 'unsupporting expansion (ex: Magic 2010)')
+      validation_spec(:expansion, :'Past Sight', true,
+                      value_text: 'unsupporting expansion (ex: Past Sight)')
     end
     describe '#rarity' do
       nil_validation_spec :rarity, true
@@ -341,15 +387,33 @@ EOS
       end
     end
     describe '#card_number' do
-      nil_validation_spec :card_number, true
-      kind_validation_spec :card_number, 0.5, Integer
-      validation_spec(:card_number, 0, true, value_text: 'zero(0)',
+      nil_validation_spec :card_number, false
+      kind_validation_spec :card_number, 159, CardNumber
+    end
+    describe 'CardNumber' do
+      def self.validation_spec(number, face, is_raise_error, desc_texts = {})
+        subject_exp = "expect { CardNumber.new(#{number}, #{face}) }"
+        value_text = desc_texts[:value_text] || if face != 'nil'
+        "( #{number} - #{face} )"
+        else
+          "( #{number} )"
+        end
+        include_examples(:validation, subject_exp, is_raise_error, value_text,
+                         desc_texts[:error_text])
+      end
+      validation_spec 'nil', 'nil', true, error_text: /can't be blank/
+      validation_spec 0.5, 'nil', true, error_text: /not a kind of Integer/
+      validation_spec 158, 'nil', false
+      validation_spec 158, "'a'", true, error_text: /not a kind of Symbol/
+      validation_spec 158, ":a", false
+      validation_spec 158, ":d", true, error_text: /not included in the list/
+      validation_spec(0, 'nil', true,
                       error_text: /must be greater than or equal to 1/)
-      validation_spec :card_number, 1, false
+      validation_spec 1, 'nil', false
     end
     describe '#artist' do
       kind_validation_spec :artist, 1, String
-      nil_validation_spec :artist, true
+      nil_validation_spec :artist, false
       strip_validation_spec :artist
     end
   end

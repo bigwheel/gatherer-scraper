@@ -8,8 +8,6 @@ class PT
   attr_reader :toughness
   validates :toughness, presence: true, format: { with: SURROUNDED_PT_REGEXP },
     kind: { type: String }
-  validates_presence_of :toughness
-  validates_format_of :toughness, with: SURROUNDED_PT_REGEXP
   def initialize(power, toughness)
     @power = power
     @toughness = toughness
@@ -20,8 +18,9 @@ class PT
     if node == nil
       nil
     else
-      match_data = node.content.strip.match(/^(#{PT_REGEXP.to_s}) \/ (#{PT_REGEXP.to_s})$/)
-      CardProperty.validate_using_exception(new(match_data[1], match_data[2]))
+      pt_regexp = /^(#{PT_REGEXP.to_s}) \/ (#{PT_REGEXP.to_s})$/
+      _, power, toughness = node.content.strip.match(pt_regexp).to_a
+      new power, toughness
     end
   end
 end

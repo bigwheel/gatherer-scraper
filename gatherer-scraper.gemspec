@@ -19,8 +19,10 @@ EOS
   gem.version       = GathererScraper::VERSION
 
   gem.add_dependency 'activemodel', '~>3.2.0'
+  gem.add_dependency 'nokogiri'
+  gem.add_development_dependency 'rake'
   gem.add_development_dependency 'rspec'
   gem.add_development_dependency 'rr'
   gem.add_development_dependency 'vcr'
-  gem.add_development_dependency 'nokogiri'
+  gem.add_development_dependency 'fakeweb'
 end
