@@ -6,8 +6,8 @@ require 'net/http'
 require 'uri'
 require 'active_model'
 
-require 'gatherer-scraper/search_result.rb'
-require 'gatherer-scraper/card_property.rb'
+require 'gatherer-scraper/search_result'
+require 'gatherer-scraper/card_property'
 
 module GathererScraper
   # Your code goes here...

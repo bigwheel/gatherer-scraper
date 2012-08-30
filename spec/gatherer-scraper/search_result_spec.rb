@@ -1,5 +1,6 @@
 require 'spec_helper'
 
+module GathererScraper
 describe GathererScraper::SearchResult do
   CardProperty::SUPPORTING_EXPANSION_LIST.each do |cardset|
     cardset = cardset.to_s
@@ -12,4 +13,5 @@ describe GathererScraper::SearchResult do
       its(:length) { should_not == 0 }
     end
   end
+end
 end

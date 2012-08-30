@@ -3,6 +3,8 @@ require 'spec_helper'
 
 require 'uri'
 
+module GathererScraper
+  include Attribute
 describe CardProperty, :vcr => { :cassette_name => 'gatherer/card', :record => :new_episodes } do
   context "when url has a 'printed=true' parameter" do
     it do
@@ -91,31 +93,12 @@ EOS
     before(:all) do
       VCR.use_cassette('gatherer/card', record: :new_episodes) do
         @slime = described_class.parse('http://gatherer.wizards.com/Pages/Card/Details.aspx?multiverseid=265718')
-        def @slime.select(overrides, attr_sym)
-          if overrides.has_key? attr_sym
-            overrides[attr_sym]
-          else
-            instance_eval "#{attr_sym}"
-          end
-        end
         def @slime.override(overrides = {})
-          CardProperty.new(select(overrides, :multiverseid),
-                           select(overrides, :card_image_url),
-                           select(overrides, :card_name),
-                           select(overrides, :mana_cost),
-                           select(overrides, :converted_mana_cost),
-                           select(overrides, :type),
-                           select(overrides, :card_text),
-                           select(overrides, :flavor_text),
-                           select(overrides, :watermark),
-                           select(overrides, :color_indicator),
-                           select(overrides, :p_t),
-                           select(overrides, :loyalty),
-                           select(overrides, :expansion),
-                           select(overrides, :rarity),
-                           select(overrides, :all_sets),
-                           select(overrides, :card_number),
-                           select(overrides, :artist))
+          attributes = {}
+          CardProperty::ATTRIBUTES.each do |attr_symbol|
+            attributes[attr_symbol] = eval(attr_symbol.to_s)
+          end
+          CardProperty.new(attributes.merge(overrides))
         end
       end
     end
@@ -374,7 +357,7 @@ EOS
       include_examples :validation, "expect { @slime.override( {:all_sets => ([AllSet.new(:'Magic 2013', :Rare)])} ) }", false, 'Array what only contains :AllSet objects', nil
       validation_spec :all_sets, [3, 2], true,
         value_text: 'containing not a AllSet object',
-        error_text: /can only contain AllSet object/
+        error_text: /can only contain \S*AllSet object/
     end
     describe AllSet do
       def self.validation_spec(set_name, rarity, is_raise_error, desc_texts = {})
@@ -428,4 +411,5 @@ EOS
       strip_validation_spec :artist
     end
   end
+end
 end
