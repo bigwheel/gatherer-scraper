@@ -22,6 +22,20 @@ class CardProperty
   validates :multiverseid, presence: true, kind: { type: Integer },
     numericality: { only_integer: true, greater_than_or_equal_to: 1 }
 
+  attr_reader :card_image_url
+  validates :card_image_url, presence: true, kind: { type: URI::HTTP }
+  validate do
+    url_text = @card_image_url.to_s
+    prefix = Regexp.escape('http://gatherer.wizards.com/Handlers/' +
+                           'Image.ashx?multiverseid=')
+    type_parameter = Regexp.escape('&type=card')
+    rotate_option = Regexp.escape('&options=rotate180')
+    image_regexp = /\A#{prefix}\d+#{type_parameter}(#{rotate_option})?\Z/
+    unless url_text =~ image_regexp
+      errors.add(:card_image_url, "#{url_text} is not a valid url")
+    end
+  end
+
   attr_reader :card_name
   validates :card_name, presence: true, kind: { type: String },
     strip: { multiline: false }
@@ -138,11 +152,12 @@ class CardProperty
   # You can create a composite key in mongoid to replace the default id using the key macro:
   # key :field <, :another_field, :one_more ....>
 
-  def initialize(multiverseid, card_name, mana_cost, converted_mana_cost,
-                 type, card_text, flavor_text, watermark, color_indicator,
-                 p_t, loyalty, expansion, rarity,
+  def initialize(multiverseid, card_image_url, card_name, mana_cost,
+                 converted_mana_cost, type, card_text, flavor_text, watermark,
+                 color_indicator, p_t, loyalty, expansion, rarity,
                  all_sets, card_number, artist)
     @multiverseid = multiverseid
+    @card_image_url = card_image_url
     @card_name = card_name
     @mana_cost = mana_cost
     @converted_mana_cost = converted_mana_cost
@@ -162,8 +177,8 @@ class CardProperty
     raise ArgumentError.new(errors.full_messages) if invalid?
   end
 
-  def self.parse(url)
-    queries = Hash[URI.decode_www_form(URI(url).query)]
+  def self.parse(card_url)
+    queries = Hash[URI.decode_www_form(URI(card_url).query)]
 
     printed = queries.delete('printed')
     if printed != nil && printed != 'false'
@@ -171,13 +186,13 @@ class CardProperty
     end
 
     multiverseid = queries.delete('multiverseid').to_i
-    card_name = queries.delete('part')
+    card_name_from_url = queries.delete('part')
     unless queries.empty?
       raise ArgumentError.new("url has unknown parameters #{queries}")
     end
 
 
-    doc = Nokogiri::HTML(open(url))
+    doc = Nokogiri::HTML(open(card_url))
     def self.xpath_class_condition(class_name)
       "[contains(concat(' ', normalize-space(@class), ' '), ' #{class_name} ')]"
     end
@@ -190,10 +205,10 @@ class CardProperty
       end
     end
     table_xpath = "//table#{xpath_class_condition('cardDetails')}"
-    if card_name
+    if card_name_from_url
       table_xpath += "[.//div[@class='label'][contains(text(), 'Card Name')]" +
         "/../div[@class='value']" +
-        "[contains(text(), #{quotes_escaped_xpath_literal(card_name)})]]"
+        "[contains(text(), #{quotes_escaped_xpath_literal(card_name_from_url)})]]"
     end
     table = doc.at_xpath(table_xpath)
 
@@ -217,6 +232,7 @@ class CardProperty
       end
     end
 
+    card_image_url = URI.join(URI(card_url), table.at_xpath('.//img[contains(@id, "cardImage")]/@src').content)
     card_name = table.value_of_label('Card Name')
     mana_cost = ManaCost.parse(table.delete_node_by_label('Mana Cost'))
     converted_mana_cost = table.value_of_label('Converted Mana Cost').to_i
@@ -260,8 +276,9 @@ class CardProperty
       raise 'There are not crawling label element' + rest_of_labels.inner_html
     end
 
-    new(multiverseid, card_name, mana_cost, converted_mana_cost, type,
-        card_text, flavor_text, watermark, color_indicator, p_t, loyalty,
-        expansion, rarity, all_sets, card_number, artist)
+    new(multiverseid, card_image_url, card_name, mana_cost,
+        converted_mana_cost, type, card_text, flavor_text, watermark,
+        color_indicator, p_t, loyalty, expansion, rarity, all_sets,
+        card_number, artist)
   end
 end

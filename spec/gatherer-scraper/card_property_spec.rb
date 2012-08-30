@@ -1,6 +1,8 @@
 # -*- encoding: utf-8 -*-
 require 'spec_helper'
 
+require 'uri'
+
 describe CardProperty, :vcr => { :cassette_name => 'gatherer/card', :record => :new_episodes } do
   context "when url has a 'printed=true' parameter" do
     it do
@@ -17,6 +19,10 @@ describe CardProperty, :vcr => { :cassette_name => 'gatherer/card', :record => :
     end
     subject { @acidic_slime }
     its(:multiverseid) { should == 265718 }
+    its(:card_image_url) do
+      should == URI.parse('http://gatherer.wizards.com/Handlers/' +
+                          'Image.ashx?multiverseid=265718&type=card')
+    end
     its(:card_name) { should == 'Acidic Slime' }
     its(:'mana_cost.mana_symbols') { should == [3, :Green, :Green] }
     its(:converted_mana_cost) { should == 5 }
@@ -94,6 +100,7 @@ EOS
         end
         def @slime.override(overrides = {})
           CardProperty.new(select(overrides, :multiverseid),
+                           select(overrides, :card_image_url),
                            select(overrides, :card_name),
                            select(overrides, :mana_cost),
                            select(overrides, :converted_mana_cost),
@@ -116,6 +123,7 @@ EOS
       subject { @slime.override }
       it 'all properties should == original\'s' do
         subject.multiverseid.should == @slime.multiverseid
+        subject.card_image_url.should == @slime.card_image_url
         subject.card_name.should == @slime.card_name
         subject.mana_cost.should == @slime.mana_cost
         subject.converted_mana_cost.should == @slime.converted_mana_cost
@@ -183,6 +191,9 @@ EOS
                       error_text: /must be greater than or equal to 1/)
       validation_spec(:multiverseid, 0, true,
                       error_text: /must be greater than or equal to 1/)
+    end
+    describe '#card_image_url' do
+      pending
     end
     describe '#card_name' do
       kind_validation_spec(:card_name, 1, String)
