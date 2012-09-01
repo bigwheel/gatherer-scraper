@@ -357,7 +357,7 @@ EOS
       include_examples :validation, "expect { @slime.override( {:all_sets => ([AllSet.new(:'Magic 2013', :Rare)])} ) }", false, 'Array what only contains :AllSet objects', nil
       validation_spec :all_sets, [3, 2], true,
         value_text: 'containing not a AllSet object',
-        error_text: /can only contain \S*AllSet object/
+        error_text: /is not a \S*AllSet object/
     end
     describe AllSet do
       def self.validation_spec(set_name, rarity, is_raise_error, desc_texts = {})
