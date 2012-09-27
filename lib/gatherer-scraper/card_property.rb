@@ -111,7 +111,8 @@ module GathererScraper
       :'Scars of Mirrodin', :'Mirrodin Besieged', :'New Phyrexia',
       :'Magic 2012',
       :'Innistrad', :'Dark Ascension', :'Avacyn Restored',
-      :'Magic 2013'
+      :'Magic 2013',
+      :'Return to Ravnica'
     ]
     validates :expansion, presence: true, kind: { type: Symbol },
       strip: true, inclusion: { in: SUPPORTING_EXPANSION_LIST }
