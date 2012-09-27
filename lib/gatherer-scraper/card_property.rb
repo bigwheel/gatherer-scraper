@@ -111,164 +111,166 @@ module GathererScraper
       :'Scars of Mirrodin', :'Mirrodin Besieged', :'New Phyrexia',
       :'Magic 2012',
       :'Innistrad', :'Dark Ascension', :'Avacyn Restored',
-      :'Magic 2013' ]
-      validates :expansion, presence: true, kind: { type: Symbol },
-        strip: true, inclusion: { in: SUPPORTING_EXPANSION_LIST }
+      :'Magic 2013',
+      :'Return to Ravnica'
+    ]
+    validates :expansion, presence: true, kind: { type: Symbol },
+      strip: true, inclusion: { in: SUPPORTING_EXPANSION_LIST }
 
-      ALL_RARITY_LIST = [:'Mythic Rare', :Rare, :Uncommon, :Common, :'Basic Land', :Special]
-      validates :rarity, presence: true, kind: { type: Symbol },
-        inclusion: { in: ALL_RARITY_LIST }
+    ALL_RARITY_LIST = [:'Mythic Rare', :Rare, :Uncommon, :Common, :'Basic Land', :Special]
+    validates :rarity, presence: true, kind: { type: Symbol },
+      inclusion: { in: ALL_RARITY_LIST }
 
-      validates :all_sets, kind: { type: Enumerable }
-      validate do
-        if all_sets == nil
-          errors.add(:all_sets, "#{all_sets} is can't be nil")
-        elsif all_sets.kind_of? Enumerable
-          all_sets.each do |all_set|
-            unless all_set.kind_of? AllSet
-              errors.add(:all_sets, "#{all_set} is not a #{AllSet} object")
-            end
+    validates :all_sets, kind: { type: Enumerable }
+    validate do
+      if all_sets == nil
+        errors.add(:all_sets, "#{all_sets} is can't be nil")
+      elsif all_sets.kind_of? Enumerable
+        all_sets.each do |all_set|
+          unless all_set.kind_of? AllSet
+            errors.add(:all_sets, "#{all_set} is not a #{AllSet} object")
           end
         end
       end
+    end
 
-      validates :card_number, kind: { type: CardNumber, allow_nil: true }
+    validates :card_number, kind: { type: CardNumber, allow_nil: true }
 
-      validates :artist, kind: { type: String, allow_nil: true },
-        strip: { multiline: false, allow_nil: true }
+    validates :artist, kind: { type: String, allow_nil: true },
+      strip: { multiline: false, allow_nil: true }
 
-      # You can define indexes on documents using the index macro:
-      # index :field <, :unique => true>
+    # You can define indexes on documents using the index macro:
+    # index :field <, :unique => true>
 
-      # You can create a composite key in mongoid to replace the default id using the key macro:
-      # key :field <, :another_field, :one_more ....>
+    # You can create a composite key in mongoid to replace the default id using the key macro:
+    # key :field <, :another_field, :one_more ....>
 
-      def initialize(attributes)
-        @multiverseid = attributes[:multiverseid]
-        @card_image_url = attributes[:card_image_url]
-        @card_name = attributes[:card_name]
-        @mana_cost = attributes[:mana_cost]
-        @converted_mana_cost = attributes[:converted_mana_cost]
-        @type = attributes[:type]
-        @card_text = attributes[:card_text]
-        @flavor_text = attributes[:flavor_text]
-        @watermark = attributes[:watermark]
-        @color_indicator = attributes[:color_indicator]
-        @p_t = attributes[:p_t]
-        @loyalty = attributes[:loyalty]
-        @expansion = attributes[:expansion]
-        @rarity = attributes[:rarity]
-        @all_sets = attributes[:all_sets]
-        @card_number = attributes[:card_number]
-        @artist = attributes[:artist]
+    def initialize(attributes)
+      @multiverseid = attributes[:multiverseid]
+      @card_image_url = attributes[:card_image_url]
+      @card_name = attributes[:card_name]
+      @mana_cost = attributes[:mana_cost]
+      @converted_mana_cost = attributes[:converted_mana_cost]
+      @type = attributes[:type]
+      @card_text = attributes[:card_text]
+      @flavor_text = attributes[:flavor_text]
+      @watermark = attributes[:watermark]
+      @color_indicator = attributes[:color_indicator]
+      @p_t = attributes[:p_t]
+      @loyalty = attributes[:loyalty]
+      @expansion = attributes[:expansion]
+      @rarity = attributes[:rarity]
+      @all_sets = attributes[:all_sets]
+      @card_number = attributes[:card_number]
+      @artist = attributes[:artist]
 
-        raise ArgumentError.new(errors.full_messages) if invalid?
+      raise ArgumentError.new(errors.full_messages) if invalid?
+    end
+
+    def self.parse(card_url)
+      queries = Hash[URI.decode_www_form(URI(card_url).query)]
+
+      printed = queries.delete('printed')
+      if printed != nil && printed != 'false'
+        raise ArgumentError.new('This class only supports oracle text')
       end
 
-      def self.parse(card_url)
-        queries = Hash[URI.decode_www_form(URI(card_url).query)]
-
-        printed = queries.delete('printed')
-        if printed != nil && printed != 'false'
-          raise ArgumentError.new('This class only supports oracle text')
-        end
-
-        multiverseid = queries.delete('multiverseid').to_i
-        card_name_from_url = queries.delete('part')
-        unless queries.empty?
-          raise ArgumentError.new("url has unknown parameters #{queries}")
-        end
-
-
-        doc = Nokogiri::HTML(open(card_url))
-        def self.xpath_class_condition(class_name)
-          "[contains(concat(' ', normalize-space(@class), ' '), ' #{class_name} ')]"
-        end
-        def self.quotes_escaped_xpath_literal(text)
-          if text.include?("'")
-            "concat('#{text.gsub("'", "', \"'\", '")}')"
-            #text.split(/(')/).map { |e| e == "'" ? %!"#{e}"! : "'#{e}'" }.join(", ")
-          else
-            "'#{text}'"
-          end
-        end
-        table_xpath = "//table#{xpath_class_condition('cardDetails')}"
-        if card_name_from_url
-          table_xpath += "[.//div[@class='label'][contains(text(), 'Card Name')]" +
-            "/../div[@class='value']" +
-            "[contains(text(), #{quotes_escaped_xpath_literal(card_name_from_url)})]]"
-        end
-        table = doc.at_xpath(table_xpath)
-
-        def table.delete_node_by_label(label_name)
-          node = at_xpath(".//div[@class='label']" +
-                          "[contains(text(), '#{label_name}')]/..")
-          return nil unless node
-
-          node.unlink.at_xpath("./div[@class='value']")
-        end
-
-        def table.value_of_label(label_name)
-          node = delete_node_by_label(label_name)
-
-          return nil if node == nil
-
-          if block_given?
-            yield node
-          else
-            node.content.strip
-          end
-        end
-
-        attrs = {}
-        attrs[:multiverseid] = multiverseid
-        card_image_xpath = './/img[contains(@id, "cardImage")]/@src'
-        card_image_relative_url = table.at_xpath(card_image_xpath).content
-        attrs[:card_image_url] = URI.join(URI(card_url), card_image_relative_url)
-        attrs[:card_name] = table.value_of_label('Card Name')
-        attrs[:mana_cost] = ManaCost.parse(table.delete_node_by_label('Mana Cost'))
-        attrs[:converted_mana_cost] = table.value_of_label('Converted Mana Cost').to_i
-        attrs[:type] = Type.parse(table.delete_node_by_label('Types'))
-        attrs[:card_text] = table.value_of_label('Card Text') do |node|
-          node.inner_html.strip
-        end
-        attrs[:flavor_text] = table.value_of_label('Flavor Text') do |node|
-          node.inner_html.strip
-        end
-        attrs[:watermark] = table.value_of_label('Watermark') do |node|
-          node.at_xpath('./div/i').inner_html.strip.to_sym
-        end
-        attrs[:color_indicator] = table.value_of_label('Color Indicator') do |node|
-          node.content.strip.split(',').map { |color| color.strip.to_sym }
-        end
-        attrs[:p_t] = PT.parse(table.delete_node_by_label('P/T'))
-        loyalty = table.value_of_label('Loyalty')
-        attrs[:loyalty] = loyalty.to_i if loyalty
-        attrs[:expansion] = table.value_of_label('Expansion') do |node|
-          node.at_xpath("div/a[contains(@href, 'Pages/Search')]").content.strip.to_sym
-        end
-        attrs[:rarity] = table.value_of_label('Rarity') do |node|
-          node.at_xpath('span').content.strip.to_sym
-        end
-        attrs[:all_sets] = AllSet.parse(table, multiverseid)
-        attrs[:card_number] = CardNumber.parse(table.delete_node_by_label('Card #'))
-        attrs[:artist] = table.value_of_label('Artist') do |node|
-          # Because value_of_label has a side effect,
-          # following rare case 29896 is written in here
-          if multiverseid == 29896
-            'Don Hazeltine'
-          else
-            node.at_xpath('a').content.strip
-          end
-        end
-        table.delete_node_by_label('Community Rating')
-
-        rest_of_labels = table.xpath(".//div[@class='label']/..")
-        unless rest_of_labels.size == 0
-          raise 'There are not crawling label element' + rest_of_labels.inner_html
-        end
-
-        new(attrs)
+      multiverseid = queries.delete('multiverseid').to_i
+      card_name_from_url = queries.delete('part')
+      unless queries.empty?
+        raise ArgumentError.new("url has unknown parameters #{queries}")
       end
+
+
+      doc = Nokogiri::HTML(open(card_url))
+      def self.xpath_class_condition(class_name)
+        "[contains(concat(' ', normalize-space(@class), ' '), ' #{class_name} ')]"
+      end
+      def self.quotes_escaped_xpath_literal(text)
+        if text.include?("'")
+          "concat('#{text.gsub("'", "', \"'\", '")}')"
+          #text.split(/(')/).map { |e| e == "'" ? %!"#{e}"! : "'#{e}'" }.join(", ")
+        else
+          "'#{text}'"
+        end
+      end
+      table_xpath = "//table#{xpath_class_condition('cardDetails')}"
+      if card_name_from_url
+        table_xpath += "[.//div[@class='label'][contains(text(), 'Card Name')]" +
+          "/../div[@class='value']" +
+          "[contains(text(), #{quotes_escaped_xpath_literal(card_name_from_url)})]]"
+      end
+      table = doc.at_xpath(table_xpath)
+
+      def table.delete_node_by_label(label_name)
+        node = at_xpath(".//div[@class='label']" +
+                        "[contains(text(), '#{label_name}')]/..")
+        return nil unless node
+
+        node.unlink.at_xpath("./div[@class='value']")
+      end
+
+      def table.value_of_label(label_name)
+        node = delete_node_by_label(label_name)
+
+        return nil if node == nil
+
+        if block_given?
+          yield node
+        else
+          node.content.strip
+        end
+      end
+
+      attrs = {}
+      attrs[:multiverseid] = multiverseid
+      card_image_xpath = './/img[contains(@id, "cardImage")]/@src'
+      card_image_relative_url = table.at_xpath(card_image_xpath).content
+      attrs[:card_image_url] = URI.join(URI(card_url), card_image_relative_url)
+      attrs[:card_name] = table.value_of_label('Card Name')
+      attrs[:mana_cost] = ManaCost.parse(table.delete_node_by_label('Mana Cost'))
+      attrs[:converted_mana_cost] = table.value_of_label('Converted Mana Cost').to_i
+      attrs[:type] = Type.parse(table.delete_node_by_label('Types'))
+      attrs[:card_text] = table.value_of_label('Card Text') do |node|
+        node.inner_html.strip
+      end
+      attrs[:flavor_text] = table.value_of_label('Flavor Text') do |node|
+        node.inner_html.strip
+      end
+      attrs[:watermark] = table.value_of_label('Watermark') do |node|
+        node.at_xpath('./div/i').inner_html.strip.to_sym
+      end
+      attrs[:color_indicator] = table.value_of_label('Color Indicator') do |node|
+        node.content.strip.split(',').map { |color| color.strip.to_sym }
+      end
+      attrs[:p_t] = PT.parse(table.delete_node_by_label('P/T'))
+      loyalty = table.value_of_label('Loyalty')
+      attrs[:loyalty] = loyalty.to_i if loyalty
+      attrs[:expansion] = table.value_of_label('Expansion') do |node|
+        node.at_xpath("div/a[contains(@href, 'Pages/Search')]").content.strip.to_sym
+      end
+      attrs[:rarity] = table.value_of_label('Rarity') do |node|
+        node.at_xpath('span').content.strip.to_sym
+      end
+      attrs[:all_sets] = AllSet.parse(table, multiverseid)
+      attrs[:card_number] = CardNumber.parse(table.delete_node_by_label('Card #'))
+      attrs[:artist] = table.value_of_label('Artist') do |node|
+        # Because value_of_label has a side effect,
+        # following rare case 29896 is written in here
+        if multiverseid == 29896
+          'Don Hazeltine'
+        else
+          node.at_xpath('a').content.strip
+        end
+      end
+      table.delete_node_by_label('Community Rating')
+
+      rest_of_labels = table.xpath(".//div[@class='label']/..")
+      unless rest_of_labels.size == 0
+        raise 'There are not crawling label element' + rest_of_labels.inner_html
+      end
+
+      new(attrs)
+    end
   end
 end
