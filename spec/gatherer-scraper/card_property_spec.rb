@@ -69,6 +69,20 @@ EOS
     its(:'card_number.face') { should == nil }
     its(:artist) { should == 'Karl Kopinski' }
   end
+
+  context "when 'Garruk, the Veil-Cursed' multiverseid is given" do
+    before(:all) do
+      VCR.use_cassette('gatherer/card', record: :new_episodes) do
+        @garruk_backside = described_class.parse('http://gatherer.wizards.com/Pages/Card/Details.aspx?multiverseid=245251')
+      end
+    end
+    subject { @garruk_backside }
+
+    its(:multiverseid) { should == 245251 }
+    its(:card_name) { should == 'Garruk, the Veil-Cursed' }
+    its(:color_indicator) { should == [:Black, :Green] }
+  end
+
   shared_examples_for :expansion do |cardset_name|
     context "when #{cardset_name} cards are given", :vcr => { :cassette_name => "gatherer/cardset/#{cardset_name}", :record => :new_episodes } do
       subject { GathererScraper::search_result(set: cardset_name) }

@@ -194,12 +194,16 @@ module GathererScraper
           "'#{text}'"
         end
       end
-      table_xpath = "//table#{xpath_class_condition('cardDetails')}"
-      if card_name_from_url
-        table_xpath += "[.//div[@class='label'][contains(text(), 'Card Name')]" +
-          "/../div[@class='value']" +
-          "[contains(text(), #{quotes_escaped_xpath_literal(card_name_from_url)})]]"
-      end
+      card_name_from_url_or_title = if card_name_from_url
+                                      card_name_from_url
+                                    else
+                                      /(?<card_name>.*)\(.*\) - Gatherer - Magic: The Gathering/ =~ doc.at_xpath("//head/title").content.strip
+                                      card_name.strip
+                                    end
+      table_xpath = "//table#{xpath_class_condition('cardDetails')}" +
+        "[.//div[@class='label'][contains(text(), 'Card Name')]" +
+        "/../div[@class='value']" +
+        "[contains(text(), #{quotes_escaped_xpath_literal(card_name_from_url_or_title)})]]"
       table = doc.at_xpath(table_xpath)
 
       def table.delete_node_by_label(label_name)
