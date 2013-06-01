@@ -112,7 +112,7 @@ module GathererScraper
       :'Magic 2012',
       :'Innistrad', :'Dark Ascension', :'Avacyn Restored',
       :'Magic 2013',
-      :'Return to Ravnica'
+      :'Return to Ravnica', :'Gatecrash', :'Dragon\'s Maze'
     ]
     validates :expansion, presence: true, kind: { type: Symbol },
       strip: true, inclusion: { in: SUPPORTING_EXPANSION_LIST }
@@ -206,9 +206,11 @@ module GathererScraper
         "[contains(text(), #{quotes_escaped_xpath_literal(card_name_from_url_or_title)})]]"
       table = doc.at_xpath(table_xpath)
 
-      def table.delete_node_by_label(label_name)
+      def table.delete_node_by_label(label_name, inner_tag = nil)
         node = at_xpath(".//div[@class='label']" +
-                        "[contains(text(), '#{label_name}')]/..")
+                        "#{inner_tag ? "/#{inner_tag}" : '' }" +
+                        "[contains(text(), '#{label_name}')]/.." +
+                        "#{inner_tag ? '/..' : '' }")
         return nil unless node
 
         node.unlink.at_xpath("./div[@class='value']")
@@ -247,7 +249,7 @@ module GathererScraper
       attrs[:color_indicator] = table.value_of_label('Color Indicator') do |node|
         node.content.strip.split(',').map { |color| color.strip.to_sym }
       end
-      attrs[:p_t] = PT.parse(table.delete_node_by_label('P/T'))
+      attrs[:p_t] = PT.parse(table.delete_node_by_label('P/T', 'b'))
       loyalty = table.value_of_label('Loyalty')
       attrs[:loyalty] = loyalty.to_i if loyalty
       attrs[:expansion] = table.value_of_label('Expansion') do |node|
@@ -257,7 +259,7 @@ module GathererScraper
         node.at_xpath('span').content.strip.to_sym
       end
       attrs[:all_sets] = AllSet.parse(table, multiverseid)
-      attrs[:card_number] = CardNumber.parse(table.delete_node_by_label('Card #'))
+      attrs[:card_number] = CardNumber.parse(table.delete_node_by_label('Card Number'))
       attrs[:artist] = table.value_of_label('Artist') do |node|
         # Because value_of_label has a side effect,
         # following rare case 29896 is written in here
@@ -267,7 +269,7 @@ module GathererScraper
           node.at_xpath('a').content.strip
         end
       end
-      table.delete_node_by_label('Community Rating')
+      table.delete_node_by_label('Community Rating', 'span')
 
       rest_of_labels = table.xpath(".//div[@class='label']/..")
       unless rest_of_labels.size == 0
