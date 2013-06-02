@@ -269,7 +269,9 @@ module GathererScraper
           node.at_xpath('a').content.strip
         end
       end
-      table.delete_node_by_label('Community Rating', 'span')
+      if table.delete_node_by_label('Community Rating', 'span') == nil
+        table.delete_node_by_label('Community Rating')
+      end
 
       rest_of_labels = table.xpath(".//div[@class='label']/..")
       unless rest_of_labels.size == 0
