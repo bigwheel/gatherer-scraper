@@ -112,7 +112,8 @@ module GathererScraper
       :'Magic 2012',
       :'Innistrad', :'Dark Ascension', :'Avacyn Restored',
       :'Magic 2013',
-      :'Return to Ravnica', :'Gatecrash', :'Dragon\'s Maze'
+      :'Return to Ravnica', :'Gatecrash', :'Dragon\'s Maze',
+      :'Magic 2014 Core Set'
     ]
     validates :expansion, presence: true, kind: { type: Symbol },
       strip: true, inclusion: { in: SUPPORTING_EXPANSION_LIST }
